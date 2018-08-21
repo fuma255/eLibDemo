@@ -175,6 +175,24 @@ void fnRecv(TCPOverlappedP* over, DWORD Transferred){
 */
 void fnSend(TCPOverlappedP* overlapped, DWORD Transferred){
 
+	TCPCallback funCall = (TCPCallback)overlapped->Callback;
+
+	if (Transferred == 0){
+		//1.GetQueuedCompletionStatus返回值为TRUE，则表示客户端是主动断开，TCP / IP协议中断开时的4次握手完成了。
+		//2.GetQueuedCompletionStatus返回值为FALSE，则表示客户端是意外断开，4次握手只完成了一部分。SOCKET错误号为：64
+		//所以lpNumberOfBytes = 0, 服务端都要处理客户断开的操作。
+		//TCP连接正常断开, 已完成四次挥手。
+		//over->errInfo = "服务断开";
+		if (overlapped->Callback != 0){
+			funCall(TCP_SERVER_DISCONNECT, 0, 0, 0, 0, overlapped->Extra, TCP_SERVER_DISCONNECT);
+			//funCall(TCP_SERVER_DISCONNECT, 0, 0, over);
+			//over->errInfo = 0;
+		}
+		free(overlapped);
+		//printf("TCP连接正常断开, 已完成四次挥手。\n");
+		return;
+	}
+
 	overlapped->sendbuflen += Transferred;//这是真正发送成功的标志
 
 	/*1:Transferred=1024  overlapped->sendbuflen=1024 overlapped->wsabuf.len=4096-1024     overlapped->wsabuf.buf=overlapped->wsabuf.buf-1024
@@ -194,7 +212,7 @@ void fnSend(TCPOverlappedP* overlapped, DWORD Transferred){
 		
 
 		if (overlapped->Callback != 0){
-			TCPCallback funCall = (TCPCallback)overlapped->Callback;
+			
 			funCall(TCP_SEND_DATA, (int)overlapped->buf, overlapped->wsabuflen, GetServerAddr(overlapped), GetServerPort(overlapped), overlapped->Extra, 0);
 			//funCall(overlapped->OperationType, (int)overlapped->wsabuf.buf, overlapped->wsabuf.len, overlapped);
 		}

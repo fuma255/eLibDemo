@@ -82,7 +82,6 @@ void CallRecv(OverlappedP* over, DWORD Transferred){
 void CallSend(OverlappedP* overlapped, DWORD Transferred){
 
 
-
 	overlapped->sendbuflen += Transferred;
 
 	/*1:Transferred=1024  overlapped->sendbuflen=1024 overlapped->wsabuf.len=4096-1024     overlapped->wsabuf.buf=overlapped->wsabuf.buf-1024
