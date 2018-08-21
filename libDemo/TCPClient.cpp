@@ -3,7 +3,6 @@
 
 
 HANDLE TCPWorkerhIocp;
-bool TCPWorkerisRun;
 
 /*
 * 初始化socket环境
@@ -19,7 +18,6 @@ bool TCPInitWinsock(){
 	//获取系统信息
 	GetSystemInfo(&system);
 	//计算最佳线程数量
-	TCPWorkerisRun = true;
 	int ThreadCount = system.dwNumberOfProcessors * 2 + 2;
 	for (int i = 0; i < ThreadCount; i++){
 		HANDLE ThreadHandle;
@@ -52,7 +50,7 @@ DWORD WINAPI TCPWorker(HANDLE iocp){
 	TCPOverlappedP* lpOverlapped;//LPOVERLAPPED
 	int ret = 0;
 
-	while (TCPWorkerisRun){
+	while (true){
 		if (GetQueuedCompletionStatus(iocp, &Transferred, (PDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 500)){
 			if (lpOverlapped == NULL){
 				continue;
@@ -353,7 +351,6 @@ int Close(TCPOverlappedP* recv){
 }
 
 void Destory(){
-	TCPWorkerisRun = false;
 	if (TCPWorkerhIocp > 0){
 		PostQueuedCompletionStatus(TCPWorkerhIocp, 0, 0, 0);
 		CloseHandle(TCPWorkerhIocp);

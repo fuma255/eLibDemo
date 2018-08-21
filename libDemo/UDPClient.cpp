@@ -117,6 +117,7 @@ bool InitWinsock(){
 	SYSTEM_INFO system;
 
 	DWORD ThreadID;
+
 	if ((hIocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0)) == NULL){
 		printf("CreateIoCompletionPort failed!\n");
 		return false;
