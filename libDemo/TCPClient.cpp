@@ -3,7 +3,7 @@
 
 
 HANDLE TCPWorkerhIocp;
-
+int TCPThreadCount;
 /*
 * 初始化socket环境
 */
@@ -18,8 +18,8 @@ bool TCPInitWinsock(){
 	//获取系统信息
 	GetSystemInfo(&system);
 	//计算最佳线程数量
-	int ThreadCount = system.dwNumberOfProcessors * 2 + 2;
-	for (int i = 0; i < ThreadCount; i++){
+	TCPThreadCount = system.dwNumberOfProcessors * 2 + 2;
+	for (int i = 0; i < TCPThreadCount; i++){
 		HANDLE ThreadHandle;
 		//创建IOCP线程 运行Worker
 		if ((ThreadHandle = CreateThread(NULL, 0, TCPWorker, TCPWorkerhIocp, 0, &ThreadID)) == NULL){
@@ -49,9 +49,14 @@ DWORD WINAPI TCPWorker(HANDLE iocp){
 	SOCKET lpCompletekey;//PULONG_PTR
 	TCPOverlappedP* lpOverlapped;//LPOVERLAPPED
 	int ret = 0;
-
+	BOOL br = false;
 	while (true){
-		if (GetQueuedCompletionStatus(iocp, &Transferred, (PDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 500)){
+		br = GetQueuedCompletionStatus(iocp, &Transferred, (PDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 0xffffffff);
+		if (lpCompletekey == TCP_DESTORY){
+			break;
+		}
+
+		if(br == TRUE){
 			if (lpOverlapped == NULL){
 				continue;
 			}
@@ -66,10 +71,14 @@ DWORD WINAPI TCPWorker(HANDLE iocp){
 			default:
 				break;
 			}
-		}
-		else{
+		}else{
 			int dwCode = WSAGetLastError();
 			if (dwCode != 258){//TIME_OUT
+
+				if (dwCode == WSA_INVALID_HANDLE){
+					break;
+				}
+
 				printf("WSAGetLastError ret code: %d\n", dwCode);
 				TCPCallback funCall = (TCPCallback)lpOverlapped->Callback;
 				switch (dwCode){
@@ -370,7 +379,9 @@ int Close(TCPOverlappedP* recv){
 
 void Destory(){
 	if (TCPWorkerhIocp > 0){
-		PostQueuedCompletionStatus(TCPWorkerhIocp, 0, 0, 0);
+		for (int i = 0; i < TCPThreadCount; i++){
+			PostQueuedCompletionStatus(TCPWorkerhIocp, 0, TCP_DESTORY, 0);
+		}
 		CloseHandle(TCPWorkerhIocp);
 		WSACleanup();
 	}

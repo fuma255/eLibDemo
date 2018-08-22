@@ -8,12 +8,13 @@
 #include <stdio.h>
 
 // 宏定义
-#define TCP_SEND_DATA 1
-#define TCP_RECV_DATA 2
-#define TCP_CLIENT_DISCONNECT 3
-#define TCP_SERVER_DISCONNECT 4
-#define TCP_EXCEPTION_DISCONNECT 5
-#define TCP_ERROR 6
+#define TCP_SEND_DATA 10
+#define TCP_RECV_DATA 20
+#define TCP_CLIENT_DISCONNECT 30
+#define TCP_SERVER_DISCONNECT 40
+#define TCP_EXCEPTION_DISCONNECT 50
+#define TCP_ERROR 60
+#define TCP_DESTORY 70
 #define TCP_BUFFER_SIZE 8192
 
 
@@ -32,7 +33,7 @@ typedef struct TCPOverlappedP{
 	u_short wPort;
 }TCPOVERLAPPEDP;
 
-typedef int(WINAPI *TCPCallback)(int, int, int, int, int, int, int);
+typedef void(WINAPI *TCPCallback)(int, int, int, int, int, int, int);
 //事件类型  数据地址 数据长度 服务地址 服务端口 附加数据 错误代码
 
 bool TCPInitWinsock();

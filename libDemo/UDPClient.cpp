@@ -3,6 +3,7 @@
 
 
 HANDLE hIocp;
+int UDPThreadCount;
 
 DWORD WINAPI Worker(HANDLE iocp){
 	DWORD Transferred;
@@ -11,8 +12,13 @@ DWORD WINAPI Worker(HANDLE iocp){
 	unsigned long iFlag = 0;
 	int ret = 0;
 	int fromLen = 16;
+	bool br = true;
 	while (true){
-		if (GetQueuedCompletionStatus(iocp, &Transferred, (LPDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 500)){
+		br = GetQueuedCompletionStatus(iocp, &Transferred, (LPDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 0xffffffff);
+		if (lpCompletekey == UDP_DESTORY){
+			break;
+		}
+		if (br){
 			if (lpOverlapped == NULL){
 				continue;
 			}
@@ -36,8 +42,6 @@ DWORD WINAPI Worker(HANDLE iocp){
 				break;
 			case UDP_SEND_DATA:
 				CallSend(lpOverlapped, Transferred);
-				break;
-			case UDP_ERROR_SOCKET:
 				break;
 			default:
 				break;
@@ -106,7 +110,10 @@ void CallSend(OverlappedP* overlapped, DWORD Transferred){
 
 void destory(){
 	if (hIocp > 0){
-		PostQueuedCompletionStatus(hIocp, 0, 0, 0);
+		for (int i = 0; i < UDPThreadCount; i++){
+			PostQueuedCompletionStatus(hIocp, 0, UDP_DESTORY, 0);
+		}
+		
 		CloseHandle(hIocp);
 	}
 }
@@ -122,8 +129,8 @@ bool InitWinsock(){
 		return false;
 	}
 	GetSystemInfo(&system);
-	int ThreadCount = system.dwNumberOfProcessors * 2;
-	for (int i = 0; i < ThreadCount; i++){
+	UDPThreadCount = system.dwNumberOfProcessors * 2;
+	for (int i = 0; i < UDPThreadCount; i++){
 		HANDLE ThreadHandle;
 		//创建IOCP线程 运行Worker
 		if ((ThreadHandle = CreateThread(NULL, 0, Worker, hIocp, 0, &ThreadID)) == NULL){
