@@ -5,51 +5,6 @@
 HANDLE hIocp;
 int UDPThreadCount;
 
-DWORD WINAPI Worker(HANDLE iocp){
-	DWORD Transferred;
-	SOCKET lpCompletekey;//PULONG_PTR
-	OverlappedP* lpOverlapped;//LPOVERLAPPED
-	unsigned long iFlag = 0;
-	int ret = 0;
-	int fromLen = 16;
-	bool br = true;
-	while (true){
-		br = GetQueuedCompletionStatus(iocp, &Transferred, (LPDWORD)&lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 0xffffffff);
-		if (lpCompletekey == UDP_DESTORY){
-			break;
-		}
-		if (br){
-			if (lpOverlapped == NULL){
-				continue;
-			}
-			switch (lpOverlapped->OperationType){
-			case UDP_RECV_DATA:
-				if (lpOverlapped->Callback != 0){
-					Callback funCall = (Callback)lpOverlapped->Callback;
-					funCall(lpOverlapped->OperationType, (int)lpOverlapped->wsabuf.buf, Transferred, inet_ntoa(lpOverlapped->addr.sin_addr), ntohs(lpOverlapped->addr.sin_port), lpOverlapped->Extra);
-				}
-				//Sleep(100);
-				ret = WSARecvFrom(lpOverlapped->socket, &lpOverlapped->wsabuf, 1, &lpOverlapped->sendbuflen, &iFlag, (sockaddr *)&lpOverlapped->addr, &fromLen, &lpOverlapped->overlapped, 0);
-				if (ret == SOCKET_ERROR){
-					ret = WSAGetLastError();
-					//#define ERROR_INVALID_HANDLE 6L //The handle is invalid.
-					if (ret != WSA_IO_PENDING){
-						printf("WSARecvFrom SOCKET_ERROR!");
-					}
-
-				}
-				//CallRecv(lpOverlapped, Transferred);
-				break;
-			case UDP_SEND_DATA:
-				CallSend(lpOverlapped, Transferred);
-				break;
-			default:
-				break;
-			}
-		}
-	}
-	return 0;
-}
 
 void CallRecv(OverlappedP* over, DWORD Transferred){
 	//FILE* pFile = fopen("C:\\Users\\Administrator\\Desktop\\fnesample\\123.txt", "a");
@@ -102,20 +57,11 @@ void CallSend(OverlappedP* overlapped, DWORD Transferred){
 		Callback funCall = (Callback)overlapped->Callback;
 		funCall(overlapped->OperationType, (int)overlapped->wsabuf.buf, Transferred, inet_ntoa(overlapped->addr.sin_addr), ntohs(overlapped->addr.sin_port), overlapped->Extra);
 		free(overlapped->buf);
+		overlapped->buf = NULL;
 		free(overlapped);
+		overlapped = NULL; 
 	}
 
-}
-
-
-void destory(){
-	if (hIocp > 0){
-		for (int i = 0; i < UDPThreadCount; i++){
-			PostQueuedCompletionStatus(hIocp, 0, UDP_DESTORY, 0);
-		}
-		
-		CloseHandle(hIocp);
-	}
 }
 
 bool InitWinsock(){
@@ -130,6 +76,7 @@ bool InitWinsock(){
 	}
 	GetSystemInfo(&system);
 	UDPThreadCount = system.dwNumberOfProcessors * 2;
+
 	for (int i = 0; i < UDPThreadCount; i++){
 		HANDLE ThreadHandle;
 		//创建IOCP线程 运行Worker
@@ -149,16 +96,85 @@ bool InitWinsock(){
 
 }
 
+
+DWORD WINAPI Worker(HANDLE iocp){
+	DWORD Transferred;
+	DWORD lpCompletekey;//PULONG_PTR
+	OverlappedP* lpOverlapped;//LPOVERLAPPED
+	unsigned long iFlag = 0;
+	int ret = 0;
+	int fromLen = 16;
+	bool br = true;
+	while (true){
+		br = GetQueuedCompletionStatus(iocp, &Transferred, &lpCompletekey, (LPOVERLAPPED *)&lpOverlapped, 0xffffffff);
+		if (lpCompletekey == 70){
+			break;
+		}
+		if (br){
+			if (lpOverlapped == NULL){
+				continue;
+			}
+			switch (lpOverlapped->OperationType){
+			case UDP_RECV_DATA:
+				if (lpOverlapped->Callback != 0){
+					Callback funCall = (Callback)lpOverlapped->Callback;
+					funCall(lpOverlapped->OperationType, (int)lpOverlapped->wsabuf.buf, Transferred, inet_ntoa(lpOverlapped->addr.sin_addr), ntohs(lpOverlapped->addr.sin_port), lpOverlapped->Extra);
+				}
+				//Sleep(100);
+				ret = WSARecvFrom(lpOverlapped->socket, &lpOverlapped->wsabuf, 1, &lpOverlapped->sendbuflen, &iFlag, (sockaddr *)&lpOverlapped->addr, &fromLen, &lpOverlapped->overlapped, 0);
+				if (ret == SOCKET_ERROR){
+					ret = WSAGetLastError();
+					//#define ERROR_INVALID_HANDLE 6L //The handle is invalid.
+					if (ret != WSA_IO_PENDING){
+						printf("WSARecvFrom SOCKET_ERROR!");
+					}
+
+				}
+				//CallRecv(lpOverlapped, Transferred);
+				break;
+			case UDP_SEND_DATA:
+				CallSend(lpOverlapped, Transferred);
+				break;
+			default:
+				break;
+			}
+		}
+		else{
+			DWORD dwCode = WSAGetLastError();
+			if (dwCode == WSA_INVALID_HANDLE){
+				break;
+			}
+
+		}
+	}
+	if (hIocp > 0)
+		CloseHandle(hIocp);
+	hIocp = 0;
+	return 0;
+}
+
 bool stop(OverlappedP *Recv){
 	if (Recv->socket != INVALID_SOCKET){
 		closesocket(Recv->socket);
 		Recv->socket = INVALID_SOCKET;
 		free(Recv);
+		Recv = NULL;
 		return true;
 	}
 	return false;
 }
 
+void destory(){
+	if (hIocp > 0){
+		
+		PostQueuedCompletionStatus(hIocp, 0, 70, 0);//多丢一个 来源鱼刺线程池 我也不知道啥原理
+		for (int i = 0; i < UDPThreadCount; i++){
+			PostQueuedCompletionStatus(hIocp, 0, 70, 0);
+		}
+		
+		//CloseHandle(hIocp);
+	}
+}
 OverlappedP* start(int clientport, int callback, int Extra){
 
 	SOCKET sid = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);

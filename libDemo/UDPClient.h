@@ -10,7 +10,6 @@
 #define UDP_SEND_DATA 10
 #define UDP_RECV_DATA 20
 #define UDP_ERROR_SOCKET 30
-#define UDP_DESTORY 40
 #define BUFFER_SIZE 8192
 typedef void(WINAPI *Callback)(int, int, int, char*, int, int);
 //事件类型  数据地址 数据长度 客户地址 客户端口 附加数据
